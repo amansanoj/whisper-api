@@ -32,6 +32,10 @@ export const burnSecret = (id: string): string | null => {
   return null;
 };
 
-export const getActiveVaultStats = () => {
-  return db.query("SELECT id, createdAt FROM secrets").all();
+export const getActiveVaultStats = (limit: number, offset: number) => {
+  return db
+    .query(
+      `SELECT id, createdAt FROM secrets ORDER BY createdAT DESC LIMIT $limit OFFSET $offset`,
+    )
+    .all({ $limit: limit, $offset: offset });
 };
