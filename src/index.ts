@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import { createSecretSchema } from "./types";
 import { burnSecret, getActiveVaultStats, insertSecret } from "./db/store";
 import { bearerAuth } from "hono/bearer-auth";
+import { rateLimiter } from "./middleware/rateLimiter";
+import { sendDiscordAlert } from "./utils/discord";
 
 const app = new Hono();
 
-app.post("/api/secrets", async (c) => {
+app.post("/api/secrets", rateLimiter, async (c) => {
   try {
     const body = await c.req.json();
 
@@ -23,6 +25,8 @@ app.post("/api/secrets", async (c) => {
     insertSecret(id, result.data.secret);
 
     const burnLink = `${new URL(c.req.url).origin}/s/${id}`;
+
+    sendDiscordAlert("Created", id);
 
     return c.json(
       {
@@ -51,6 +55,8 @@ app.get("/s/:id", (c) => {
       410,
     );
   }
+
+  sendDiscordAlert("Burned", id);
 
   return c.json(
     {
