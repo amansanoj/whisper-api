@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { createSecretSchema } from "./types";
-import { burnSecret, getActiveVaultStats, insertSecret } from "./db/store";
+import {
+  burnSecret,
+  getActiveVaultStats,
+  insertSecret,
+  readSecret,
+} from "./db/store";
 import { bearerAuth } from "hono/bearer-auth";
 import { rateLimiter } from "./middleware/rateLimiter";
 import { sendDiscordAlert } from "./utils/discord";
@@ -22,7 +27,7 @@ app.post("/api/secrets", rateLimiter, async (c) => {
 
     const id = Math.random().toString(36).substring(2, 8);
 
-    insertSecret(id, result.data.secret);
+    insertSecret(id, result.data.secret, result.data.allowedViews);
 
     const burnLink = `${new URL(c.req.url).origin}/s/${id}`;
 
@@ -44,9 +49,9 @@ app.post("/api/secrets", rateLimiter, async (c) => {
 app.get("/s/:id", (c) => {
   const id = c.req.param("id");
 
-  const secret = burnSecret(id);
+  const result = readSecret(id);
 
-  if (!secret) {
+  if (!result) {
     return c.json(
       {
         error: "410 Gone",
@@ -56,12 +61,18 @@ app.get("/s/:id", (c) => {
     );
   }
 
-  sendDiscordAlert("Burned", id);
+  if (result.wasBurned) {
+    sendDiscordAlert("Burned", id);
+  } else {
+    console.log(`Secret ${id} was read. ${result.remainingViews} views left.`);
+  }
 
   return c.json(
     {
-      warning: "This message has been permanently deleted from the server.",
-      secret,
+      warning: result.wasBurned
+        ? "This message has been permanently deleted from the server."
+        : `This message will self-destruct in ${result.remainingViews} more views.`,
+      secret: result.secret,
     },
     200,
   );
