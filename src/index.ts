@@ -37,7 +37,10 @@ app.post("/api/secrets", rateLimiter, async (c) => {
       {
         message: "Secret vaulted.",
         burnLink,
-        expires: "Upon first read.",
+        expires:
+          result.data.allowedViews === 1
+            ? "Upon first read."
+            : `After ${result.data.allowedViews} reads.`,
       },
       201,
     );
